@@ -1,6 +1,5 @@
 #!/bin/bash
-
-OAUTH_TOKEN="/data/${GMVAULT_EMAIL_ADDRESS}.oauth2"
+set -euo pipefail
 
 if [ "$GMVAULT_OPTIONS" != "" ]; then
 	echo "Gmvault will run with the following additional options: $GMVAULT_OPTIONS."
@@ -13,8 +12,8 @@ echo "Sending email reports to $GMVAULT_SEND_REPORTS_TO."
 # Adjust timezone.
 GMVAULT_TIMEZONE=${GMVAULT_TIMEZONE:="America/Los_Angeles"}
 cp /usr/share/zoneinfo/${GMVAULT_TIMEZONE} /etc/localtime
-echo ${GMVAULT_TIMEZONE} > /etc/timezone
-echo "Date: `date`."
+echo ${GMVAULT_TIMEZONE} >/etc/timezone
+echo "Startup: $(date)."
 
 # Set up Gmvault group.
 GMVAULT_GID=${GMVAULT_GID:="$GMVAULT_DEFAULT_GID"}
@@ -35,34 +34,40 @@ echo "Using user ID $(id -u gmvault)."
 chown -R gmvault:gmvault /data
 
 # Set up crontab.
-echo "" > $CRONTAB
-echo "${GMVAULT_FULL_SYNC_SCHEDULE} /app/backup_full.sh" >> $CRONTAB
-echo "${GMVAULT_QUICK_SYNC_SCHEDULE} /app/backup_quick.sh" >> $CRONTAB
+echo "" >$CRONTAB
 
-# Start app.
-if [ -f $OAUTH_TOKEN ]; then
-	echo "Using OAuth token found at $OAUTH_TOKEN."
+emails=($(echo $GMVAULT_EMAIL_ADDRESSES | tr "," "\n"))
+for email in "${emails[@]}"; do
+	OAUTH_TOKEN="/data/$email.oauth2"
 
-	if [ "$GMVAULT_SYNC_ON_STARTUP" == "yes" ]; then
-		if [ -d /data/db ]; then
-			echo "Existing database directory found, running quick sync."
-			su-exec gmvault "/app/backup_quick.sh"
+	if [ -f $OAUTH_TOKEN ]; then
+		echo "Using OAuth token found at $OAUTH_TOKEN"
+
+		echo "${GMVAULT_FULL_SYNC_SCHEDULE} /app/backup_full.sh $email" >>$CRONTAB
+		echo "${GMVAULT_QUICK_SYNC_SCHEDULE} /app/backup_quick.sh $email" >>$CRONTAB
+
+		if [ "$GMVAULT_SYNC_ON_STARTUP" == "yes" ]; then
+			if [ -d /data/$email/db ]; then
+				echo "Existing database directory found, running quick sync."
+				su-exec gmvault /app/backup_quick.sh $email
+			else
+				echo "No existing database found, running full sync."
+				su-exec gmvault /app/backup_full.sh $email
+			fi
 		else
-			echo "No existing database found, running full sync."
-			su-exec gmvault "/app/backup_full.sh"
+			echo "No sync on startup, see GMVAULT_SYNC_ON_STARTUP if you would like to change this."
 		fi
+
 	else
-		echo "No sync on startup, see GMVAULT_SYNC_ON_STARTUP if you would like to change this."
+		echo "#############################"
+		echo "#   OAUTH SETUP REQUIRED!   #"
+		echo "#############################"
+		echo ""
+		echo "No Gmail OAuth token found at $OAUTH_TOKEN."
+		echo "Please set it up with the instructions at https://github.com/guillaumeaubert/gmvault-docker#running-this-container-for-the-first-time."
+
+		/bin/bash
 	fi
+done
 
-	crond -f
-fi
-
-echo "#############################"
-echo "#   OAUTH SETUP REQUIRED!   #"
-echo "#############################"
-echo ""
-echo "No Gmail OAuth token found at $OAUTH_TOKEN."
-echo "Please set it up with the instructions at https://github.com/guillaumeaubert/gmvault-docker#running-this-container-for-the-first-time."
-
-/bin/bash
+crond -f
