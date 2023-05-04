@@ -34,14 +34,8 @@ RUN pip install gmvault/dist/gmvault-*.tar.gz
 
 RUN rm -rf /var/cache/apk/*
 
-RUN addgroup -g "$GMVAULT_DEFAULT_GID" gmvault &&
-	adduser \
-		-H `# No home directory` \
-		-D `# Don't assign a password` \
-		-u "$GMVAULT_DEFAULT_UID" \
-		-s "/bin/bash" \
-		-G "gmvault" \
-		gmvault
+RUN addgroup -g "$GMVAULT_DEFAULT_GID" gmvault
+RUN adduser -H -D -u "$GMVAULT_DEFAULT_UID" -s "/bin/bash" -G "gmvault" gmvault
 
 # Monkey-patch to support large mailboxes.
 RUN sed -i '/^import imaplib/a imaplib._MAXLINE = 10000000' $(find / -name 'imapclient.py')
