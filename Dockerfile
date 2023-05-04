@@ -14,21 +14,28 @@ RUN mkdir /app
 
 # Set up environment.
 RUN apk add --update \
-		bash \
-		ca-certificates \
-		mailx \
-		py-pip \
-		python2 \
-		ssmtp \
-		shadow \
-		su-exec \
-		tzdata \
-	&& python -m ensurepip \
-	&& pip install --upgrade pip \
-	&& pip install gmvault \
-	&& rm -rf /var/cache/apk/* \
-	&& addgroup -g "$GMVAULT_DEFAULT_GID" gmvault \
-	&& adduser \
+	bash \
+	ca-certificates \
+	mailx \
+	py-pip \
+	python3 \
+	ssmtp \
+	shadow \
+	su-exec \
+	tzdata \
+	git
+
+RUN python -m ensurepip && pip install --upgrade pip build
+
+RUN git clone https://github.com/gaubert/gmvault
+RUN sed -i 's/Logbook==0.10.1/Logbook/g' gmvault/setup.py
+RUN python3 -m build gmvault
+RUN pip install gmvault/dist/gmvault-*.tar.gz
+
+RUN rm -rf /var/cache/apk/*
+
+RUN addgroup -g "$GMVAULT_DEFAULT_GID" gmvault &&
+	adduser \
 		-H `# No home directory` \
 		-D `# Don't assign a password` \
 		-u "$GMVAULT_DEFAULT_UID" \
