@@ -27,7 +27,8 @@ RUN apk add --update \
 
 RUN python -m ensurepip && pip install --upgrade pip build
 
-RUN git clone https://github.com/gaubert/gmvault
+# RUN git clone https://github.com/gaubert/gmvault
+RUN git clone https://github.com/hcooper/gmvault-python3 gmvault
 RUN sed -i 's/Logbook==0.10.1/Logbook/g' gmvault/setup.py
 RUN python3 -m build gmvault
 RUN pip install gmvault/dist/gmvault-*.tar.gz
